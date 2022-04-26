@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdbool.h>
+#include <math.h>
 
 // The Lisp object type
 enum { // Regular objects visible from the user
@@ -44,24 +45,36 @@ typedef struct Obj {
     };
 } Obj;
 
-// Constants
-static Obj *True  = &(Obj){ .type=TBOOL,  .bvalue=true };
-static Obj *False = &(Obj){ .type=TBOOL,  .bvalue=false };
-static Obj *Zero  = &(Obj){ .type=TFLOAT, .fvalue=0.0 };
-static Obj *Empty = &(Obj){ .type=TSTRING,.str="" };
-static Obj *Nil   = &(Obj){ .type=TNIL };
-
 void *root = NULL;
 void *env = NULL;
 
+// Constants
+Obj *True  = &(Obj){ .type=TBOOL,   .bvalue=true };
+Obj *False = &(Obj){ .type=TBOOL,   .bvalue=false };
+Obj *Zero  = &(Obj){ .type=TFLOAT,  .fvalue=0.0 };
+Obj *Pi    = &(Obj){ .type=TFLOAT,  .fvalue=M_PI };
+Obj *Empty = &(Obj){ .type=TSTRING, .str="" };
+Obj *Nil   = &(Obj){ .type=TNIL };
+
 // (print expr)
-static Obj *prim_print(void *root, Obj *env, Obj *obj) {
+Obj *prim_print(void *root, Obj *env, Obj *obj) {
     // DEFINE1(tmp);
-    printf("%s", obj->str);
+    switch (obj->type) {
+        case TNIL: printf("nil"); break;
+        case TBOOL: printf("%s", (obj->bvalue)?"true":"false"); break;
+        case TFLOAT: printf("%f", obj->fvalue); break;
+        case TSTRING: printf("%s", obj->str); break;
+        case TSYMBOL: printf("symbol(%s)", obj->name); break;
+        case TPRIMITIVE: printf("<primitive>"); break;
+        case TFUNCTION: printf("<function>"); break;
+    }
     return Nil;
 }
 
-int main() {
-    Obj *s = &(Obj){ .type=TSTRING,.str="Hello!\n" };
-    prim_print(root, env, s);
+Obj *prim_println(void *root, Obj *env, Obj *obj) {
+    prim_print(root, env, obj);
+    printf("\n");
 }
+
+Obj *Println = &(Obj){ .type=TPRIMITIVE, .pf=prim_print };
+

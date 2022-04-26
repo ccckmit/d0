@@ -1,0 +1,8 @@
+#include <init.c>
+#include <lex.c>
+
+int main(int argc, char **argv) {
+    read_source(argv[1]);
+    lex(source);
+}
+
