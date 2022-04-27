@@ -1,22 +1,13 @@
 #include <obj.c>
 
-char st[NMAX], *stp = st;
-
-char *st_add(char *str, int len) {
-    char *s = stp;
-    memcpy(stp, str, len);
-    stp += len;
-    *stp++ = '\0';
-    return s;
-}
-
-typedef struct symbol {
+typedef struct sym_t {
     char *name;
+    int len;
     Obj *obj;
-} symbol_t;
+} sym_t;
 
 #define NSYM 9997
-symbol_t sym[NSYM];
+sym_t symtb[NSYM];
 
 int hash(char *name, int len) { // 計算雜湊值
     char *p = name;
@@ -28,27 +19,30 @@ int hash(char *name, int len) { // 計算雜湊值
 }
 
 int sym_init() {
-    memset(sym, 0, sizeof(sym));
+    memset(symtb, 0, sizeof(symtb));
 }
 
-symbol_t *sym_find(char *name, int len, bool *found) {
+sym_t *sym_find(char *name, int len, bool *found) {
     int si = hash(name, len)%NSYM, i=si;
     while (1) {
-        if (!sym[i].name) { *found=false; return &sym[i]; }
-        if (memcmp(sym[i].name, name, len)==0) { *found=true; return &sym[i]; }
+        sym_t *sym = &symtb[i];
+        if (!sym->name) { *found=false; return sym; }
+        if (len == sym->len && memcmp(sym->name, name, len)==0) { 
+            *found=true; return sym;
+        }
         if (++i == si) { *found=false; return NULL; }
     }
 }
 
-symbol_t *sym_get(char *name, int len) {
+sym_t *sym_get(char *name, int len) {
     bool found;
-    symbol_t *s = sym_find(name, len, &found);
-    return s;
+    sym_t *sym = sym_find(name, len, &found);
+    return sym;
 }
 
-symbol_t *sym_add(char *name, int len) {
+sym_t *sym_add(char *name, int len) {
     bool found;
-    symbol_t *s = sym_find( name, len, &found);
-    if (!found) s->name = st_add(name, len);
-    return s;
+    sym_t *sym = sym_find(name, len, &found);
+    if (!found) { sym->name=name; sym->len = len; }
+    return sym;
 }

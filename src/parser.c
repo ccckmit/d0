@@ -1,7 +1,8 @@
-#define emit(...) { printf("  "); printf(__VA_ARGS__); printf("\n"); }
+#include <lex.c>
+// #define emit(...) { printf("  "); printf(__VA_ARGS__); printf("\n"); }
 #define error(...) { fprintf(stderr, __VA_ARGS__); exit(1); }
 
-token_t skip(token_id t) {
+token_t skip(int t) {
     token_t r = tk;
     if (tk.id==t)
         next();
@@ -10,21 +11,25 @@ token_t skip(token_id t) {
     return r;
 }
 
-bool token_eq(char *str) {
+bool match(char *str) {
     int len = strlen(str);
     return len == tk.len && memcmp(str, tk.str, len)==0;
 }
 
+token_t tk0; char *p0;
+void scan_save() { tk0 = tk; p0=p; }
+void scan_restore() { tk = tk0; p=p0; }
+
+void emit1(int op) { *e++=op; }
+void emit2(int op, sym_t *sym) { *e++=op; *e++=sym-symtb; }
+
 int expr();
 
-// TERM = number | string | id | call=id(EXP) | (EXP)
+// TERM = number | string | id | (EXP) | [-~!] TERM ([EXP] | (EXP)) 
 int term() {
     token_t t=tk; 
-    if (t.id == Id) {
-        emit("load %.*s", t.len, t.str);
-        next();
-    } else if (t.id == Num) {
-        emit("loadf %lf", tk_float); // ???
+    if (t.id == Id || t.id == Num || t.id == Str) {
+        emit2(Load, tk.sym);
         next();
     } else if (t.id == '(') {
         skip('(');
@@ -39,11 +44,11 @@ int term() {
 // op = +-*/....
 int expr() {
     term();
-    while (tk.id >= Lor && tk.id <= Mod) {
+    while (strchr("|&=^+-*/%", tk.id) || tk.id >= Op2) {
         token_t op = tk; next();
-        emit("push");
+        emit1(Push);
         term();
-        emit("%s", tk_name(op.id));
+        emit1(op.id);
     }
 }
 
@@ -52,19 +57,17 @@ int stmt() {
     token_t id;
     bool assign = false;
     if (tk.id == Id) {
-        token_t tk0 = tk;
-        char *p0 = p; // 儲存掃描點
+        scan_save();
         id = skip(Id);
-        if (tk.id == Assign) {
-            skip(Assign);
+        if (tk.id == '=') {
+            skip('=');
             assign = true;
         } else {
-            p = p0; // 還原掃描點到 stmt 開頭
-            tk = tk0; 
+            scan_restore(); // 還原掃描點到 stmt 開頭
         }
     }
     expr();
-    if (assign) emit("store %.*s", id.len, id.str);
+    if (assign) emit2(Store, id.sym);
     skip(';');
 }
 
@@ -79,4 +82,4 @@ int parse(char *source) {
     p = source;
     next();
     prog();
-}
+} 

@@ -1,5 +1,4 @@
 #include <init.c>
-#include <lex.c>
 #include <parser.c>
 
 int main(int argc, char **argv) {
