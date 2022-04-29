@@ -1,5 +1,3 @@
-#include <obj.c>
-
 typedef struct sym_t {
     char *name;
     int len;

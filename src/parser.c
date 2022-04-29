@@ -1,13 +1,9 @@
-#include <lex.c>
-// #define emit(...) { printf("  "); printf(__VA_ARGS__); printf("\n"); }
-#define error(...) { fprintf(stderr, __VA_ARGS__); exit(1); }
-
 token_t skip(int t) {
     token_t r = tk;
-    if (tk.id==t)
+    if (tk.type==t)
         next();
     else
-        error("skip id=%d=%c, but got a %d\n", t, t, tk.id);
+        error("skip type=%d=%c, but got a %d\n", t, t, tk.type);
     return r;
 }
 
@@ -20,66 +16,80 @@ token_t tk0; char *p0;
 void scan_save() { tk0 = tk; p0=p; }
 void scan_restore() { tk = tk0; p=p0; }
 
-void emit1(int op) { *e++=op; }
-void emit2(int op, sym_t *sym) { *e++=op; *e++=sym-symtb; }
-
-int expr();
+node_t *expr();
 
 // TERM = number | string | id | (EXP) | [-~!] TERM ([EXP] | (EXP)) 
-int term() {
-    token_t t=tk; 
-    if (t.id == Id || t.id == Num || t.id == Str) {
-        emit2(Load, tk.sym);
+node_t *term() {
+    token_t t=tk;
+    node_t *n;
+    if (t.type == Id || t.type == Num || t.type == Str) {
         next();
-    } else if (t.id == '(') {
+        n = node(Id);
+        n->sym = t.sym;
+    } else if (t.type == '(') {
         skip('(');
-        expr();
+        n = expr();
         skip(')');
     } else {
-        error("term start with id=%d=%c, str=%10s", t.id, t.id, t.str);
+        error("term start with type=%d=%c, str=%10s", t.type, t.type, t.str);
     }
+    return n;
 }
 
 // EXPR = TERM (op TERM)*
 // op = +-*/....
-int expr() {
-    term();
-    while (strchr("|&=^+-*/%", tk.id) || tk.id >= Op2) {
+node_t *expr() {
+    node_t *n=term();
+    while (is_op2(tk.type)) {
         token_t op = tk; next();
-        emit1(Push);
-        term();
-        emit1(op.id);
+        node_t *n2 = term();
+        n = op2(op.type, n, n2);
     }
+    return n;
 }
 
 // STMT = (id=)?expr;
-int stmt() {
+node_t *stmt() {
     token_t id;
     bool assign = false;
-    if (tk.id == Id) {
+    if (tk.type == Id) {
         scan_save();
         id = skip(Id);
-        if (tk.id == '=') {
+        if (tk.type == '=') {
             skip('=');
             assign = true;
         } else {
             scan_restore(); // 還原掃描點到 stmt 開頭
         }
     }
-    expr();
-    if (assign) emit2(Store, id.sym);
-    skip(';');
-}
-
-// PROG = STMTS*
-int prog() {
-    while (tk.id != None) {
-        stmt();
+    node_t *n = expr();
+    if (assign) {
+        node_t *nid = node(Id);
+        nid->sym = id.sym;
+        n = op2('=', nid, n);
     }
+    skip(';');
+    return n;
 }
 
-int parse(char *source) {
+// PROG = STMTS
+node_t *stmts() {
+    node_t *list = node(Stmts), *p=list;
+    while (tk.type != None) {
+        node_t *s = stmt();
+        p->node = s;
+        p->next = node(Stmts);
+        p = p->next;
+    }
+    return list;
+}
+
+node_t *prog() {
+    return stmts();
+}
+
+node_t *parse(char *source) {
     p = source;
     next();
-    prog();
-} 
+    return prog();
+}
